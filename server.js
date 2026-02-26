@@ -1,15 +1,11 @@
-// server.js
 const express = require('express');
 const cors = require('cors');
 const { lookupDIN } = require('./dinLookup');
 
 const app = express();
 
-// Allow all origins (quick test)
+// Allow all origins
 app.use(cors());
-
-// OR, allow only Shopify preview / domain:
-// app.use(cors({ origin: ['https://jy3rctf5b28vdhrq-68298375249.shopifypreview.com'] }));
 
 app.use(express.json());
 

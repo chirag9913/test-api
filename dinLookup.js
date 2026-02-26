@@ -1,22 +1,14 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 
 async function lookupDIN(din) {
   const start = Date.now();
 
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-extensions',
-      '--disable-default-apps',
-      '--disable-translate',
-      '--disable-sync',
-      '--no-first-run',
-      '--window-size=1280,720'
-    ],
-    defaultViewport: { width: 1280, height: 720 }
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 
   const page = await browser.newPage();
@@ -27,10 +19,11 @@ async function lookupDIN(din) {
     const url = req.url();
     const type = req.resourceType();
 
-    // Block tracking, analytics, social, ads, fonts, images
-    const blockedDomains = ['facebook', 'twitter', 'linkedin', 'instagram', 'youtube',
-      'google-analytics', 'googletagmanager', 'static-assets.ny.gov', 'jquery',
-      'bootstrapcdn', 'cloudflare', 'cdn.jsdelivr'];
+    const blockedDomains = [
+      'facebook', 'twitter', 'linkedin', 'instagram', 'youtube',
+      'google-analytics', 'googletagmanager', 'static-assets.ny.gov',
+      'jquery', 'bootstrapcdn', 'cloudflare', 'cdn.jsdelivr'
+    ];
 
     if (['image', 'font', 'media'].includes(type)) return req.abort();
     if (blockedDomains.some(d => url.includes(d))) return req.abort();
@@ -48,7 +41,6 @@ async function lookupDIN(din) {
     { timeout: 30000 }
   );
 
-  // Only wait for DOM, not full network idle (Blazor handles the rest)
   await page.goto('https://nysdoccslookup.doccs.ny.gov/', {
     waitUntil: 'domcontentloaded'
   });
@@ -79,16 +71,16 @@ async function lookupDIN(din) {
 }
 
 // ─────────────────────────────────────────────
-// BONUS: Reuse browser for multiple DIN lookups
-// (much faster than launching a new browser each time)
+// Reuse browser for multiple DIN lookups
 // ─────────────────────────────────────────────
 async function lookupMultipleDINs(dinList) {
-  const puppeteer = require('puppeteer');
   const start = Date.now();
 
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 
   const results = [];
@@ -98,14 +90,18 @@ async function lookupMultipleDINs(dinList) {
 
     await page.setRequestInterception(true);
     page.on('request', req => {
-      const blockedDomains = ['facebook', 'twitter', 'linkedin', 'instagram',
-        'static-assets.ny.gov', 'google-analytics', 'googletagmanager'];
+      const blockedDomains = [
+        'facebook', 'twitter', 'linkedin', 'instagram',
+        'static-assets.ny.gov', 'google-analytics', 'googletagmanager'
+      ];
       if (['image', 'font', 'media'].includes(req.resourceType())) return req.abort();
       if (blockedDomains.some(d => req.url().includes(d))) return req.abort();
       req.continue();
     });
 
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    );
 
     const apiResponsePromise = page.waitForResponse(
       res => res.url().includes('/IncarceratedPerson/SearchByDin') && res.status() === 200,
@@ -134,13 +130,4 @@ async function lookupMultipleDINs(dinList) {
   return results;
 }
 
-// ─────────────────────────────────────────────
-// RUN
-// ─────────────────────────────────────────────
-
-// Single lookup
-lookupDIN('12A3456').then(console.log).catch(console.error);
-
-// Multiple lookups (uncomment to use)
-// lookupMultipleDINs(['12A3456', '23B5678']).then(console.log).catch(console.error);
-module.exports = { lookupDIN };
+module.exports = { lookupDIN, lookupMultipleDINs };
