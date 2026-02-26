@@ -3,7 +3,7 @@ services:
     name: test-api
     env: node
     plan: free
-    buildCommand: npm install && PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer npx puppeteer browsers install chrome
+    buildCommand: npm install && npx puppeteer browsers install chrome --path /opt/render/.cache/puppeteer
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -12,5 +12,3 @@ services:
         value: "false"
       - key: PUPPETEER_CACHE_DIR
         value: /opt/render/.cache/puppeteer
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: /opt/render/.cache/puppeteer/chrome/linux-145.0.7632.77/chrome-linux64/chrome
