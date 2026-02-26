@@ -13,7 +13,6 @@ async function lookupDIN(din) {
 
   const page = await browser.newPage();
 
-  // Block everything except the Blazor app essentials
   await page.setRequestInterception(true);
   page.on('request', req => {
     const url = req.url();
@@ -32,29 +31,36 @@ async function lookupDIN(din) {
   });
 
   await page.setUserAgent(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   );
 
-  // Listen for the API response BEFORE navigating
+  // Set up response listener BEFORE navigating - 60 second timeout
   const apiResponsePromise = page.waitForResponse(
     res => res.url().includes('/IncarceratedPerson/SearchByDin') && res.status() === 200,
-    { timeout: 30000 }
+    { timeout: 90000 }
   );
 
+  // Wait for full network settle so Blazor is ready
   await page.goto('https://nysdoccslookup.doccs.ny.gov/', {
-    waitUntil: 'domcontentloaded'
+    waitUntil: 'networkidle2',
+    timeout: 90000
   });
 
-  // Wait for Blazor to render the input field
-  await page.waitForSelector('#din', { timeout: 20000 });
+  // Wait for input to appear
+  await page.waitForSelector('#din', { timeout: 90000 });
 
   console.log(`Page ready in ${Date.now() - start}ms`);
 
-  // Type instantly and submit
-  await page.type('#din', din, { delay: 0 });
+  // Give Blazor a moment to become interactive
+  await new Promise(r => setTimeout(r, 1000));
+
+  // Type with slight delay so Blazor registers keystrokes
+  await page.type('#din', din, { delay: 50 });
+  await new Promise(r => setTimeout(r, 500));
   await page.keyboard.press('Enter');
 
-  // Grab the API response
+  console.log(`Submitted, waiting for API response...`);
+
   const response = await apiResponsePromise;
 
   let data;
@@ -70,9 +76,6 @@ async function lookupDIN(din) {
   return data;
 }
 
-// ─────────────────────────────────────────────
-// Reuse browser for multiple DIN lookups
-// ─────────────────────────────────────────────
 async function lookupMultipleDINs(dinList) {
   const start = Date.now();
 
@@ -105,12 +108,18 @@ async function lookupMultipleDINs(dinList) {
 
     const apiResponsePromise = page.waitForResponse(
       res => res.url().includes('/IncarceratedPerson/SearchByDin') && res.status() === 200,
-      { timeout: 30000 }
+      { timeout: 60000 }
     );
 
-    await page.goto('https://nysdoccslookup.doccs.ny.gov/', { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('#din', { timeout: 20000 });
-    await page.type('#din', din, { delay: 0 });
+    await page.goto('https://nysdoccslookup.doccs.ny.gov/', {
+      waitUntil: 'networkidle2',
+      timeout: 60000
+    });
+
+    await page.waitForSelector('#din', { timeout: 60000 });
+    await new Promise(r => setTimeout(r, 1000));
+    await page.type('#din', din, { delay: 50 });
+    await new Promise(r => setTimeout(r, 500));
     await page.keyboard.press('Enter');
 
     try {
